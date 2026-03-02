@@ -46,10 +46,6 @@ class StreamConfigRequest(BaseModel):
         description="Lattice API URL"
     )
     # ChatSurfer fields
-    chatsurferSession: Optional[str] = Field(
-        default="",
-        description="ChatSurfer SESSION cookie value"
-    )
     chatsurferRoom: Optional[str] = Field(
         default="",
         description="ChatSurfer room name"
