@@ -33,6 +33,21 @@ env:
   CCTV_SSL_VERIFY: "true"
   CCTV_ENV: "production"
 
+# Existing secret to be loaded as environment variables (e.g. API keys)
+existingSecret: "cctv-viewer"
+
+# Extra volumes for the pod (e.g. Secret volumes containing certificates)
+extraVolumes:
+  - name: certs-volume
+    secret:
+      secretName: cosmic-npe
+
+# Mount paths for extra volumes
+extraVolumeMounts:
+  - name: certs-volume
+    mountPath: "/certs"
+    readOnly: true
+
 service:
   type: ClusterIP
   portApi: 8000
@@ -150,7 +165,7 @@ config:
     max_size_mb: 100
     backup_count: 5
   stream_out:
-    enabled: false
+    enabled: true
     format: "cot"
     cot:
       ip: "127.0.0.1"
