@@ -1,12 +1,12 @@
 replicaCount: 1
 
 image:
-  repository: cctv-viewer
-  pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  repository: harbor.i2cv.io/cosmichorizon/cctv-viewer-image
+  tag: latest
+  pullPolicy: Always
 
-imagePullSecrets: []
+imagePullSecrets:
+  - name: s-hxl2n
 nameOverride: ""
 fullnameOverride: ""
 
