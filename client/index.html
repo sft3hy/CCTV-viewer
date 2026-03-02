@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -83,6 +84,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <div class="header-top">
@@ -90,15 +92,17 @@
                 <h1>Taiwan Highway CCTV Viewer</h1>
                 <div class="header-actions">
                     <a href="map.html" class="btn" target="_blank">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                            <circle cx="12" cy="10" r="3"/>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
                         </svg>
                         Map View
                     </a>
                     <a href="monitoring.html" class="btn btn-success" target="_blank">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                         </svg>
                         Monitoring
                     </a>
@@ -120,25 +124,24 @@
 
         <div class="controls">
             <div class="search-box" id="searchContainer">
-                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/>
-                    <path d="m21 21-4.35-4.35"/>
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
                 </svg>
-                <input type="text"
-                       id="searchInput"
-                       placeholder="Search by location, road name, or ID..."
-                       aria-label="Search feeds"
-                       autocomplete="off">
+                <input type="text" id="searchInput" placeholder="Search by location, road name, or ID..."
+                    aria-label="Search feeds" autocomplete="off">
                 <button class="search-clear" id="searchClear" aria-label="Clear search">&times;</button>
                 <div class="search-results" id="searchResults"></div>
             </div>
             <div class="filter-buttons" role="group" aria-label="Filter feeds">
                 <button class="btn active" id="showAllBtn" data-filter="all" aria-pressed="true">Show All</button>
                 <button class="btn" id="showWorkingBtn" data-filter="working" aria-pressed="false">Working Only</button>
-                <button class="btn" id="showOccupiedBtn" data-filter="occupied" aria-pressed="false">TAI Occupied</button>
+                <button class="btn" id="showOccupiedBtn" data-filter="occupied" aria-pressed="false">TAI
+                    Occupied</button>
                 <button class="btn" id="streamOutBtn" aria-haspopup="dialog">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
                     </svg>
                     Stream Out
                 </button>
@@ -154,21 +157,27 @@
     <main class="grid-container" id="feedGrid" role="grid" aria-label="CCTV feed grid">
         <!-- Loading skeleton -->
         <div class="feed-card" aria-hidden="true">
-            <div class="feed-thumbnail"><div class="skeleton skeleton-image"></div></div>
+            <div class="feed-thumbnail">
+                <div class="skeleton skeleton-image"></div>
+            </div>
             <div class="feed-info">
                 <div class="skeleton skeleton-text"></div>
                 <div class="skeleton skeleton-text short"></div>
             </div>
         </div>
         <div class="feed-card" aria-hidden="true">
-            <div class="feed-thumbnail"><div class="skeleton skeleton-image"></div></div>
+            <div class="feed-thumbnail">
+                <div class="skeleton skeleton-image"></div>
+            </div>
             <div class="feed-info">
                 <div class="skeleton skeleton-text"></div>
                 <div class="skeleton skeleton-text short"></div>
             </div>
         </div>
         <div class="feed-card" aria-hidden="true">
-            <div class="feed-thumbnail"><div class="skeleton skeleton-image"></div></div>
+            <div class="feed-thumbnail">
+                <div class="skeleton skeleton-image"></div>
+            </div>
             <div class="feed-info">
                 <div class="skeleton skeleton-text"></div>
                 <div class="skeleton skeleton-text short"></div>
@@ -220,36 +229,38 @@
 
                 <div class="config-row cot-fields">
                     <label for="streamPort">Port:</label>
-                    <input type="number" id="streamPort" class="config-input" placeholder="8087" value="8087" min="1" max="65535">
+                    <input type="number" id="streamPort" class="config-input" placeholder="8087" value="8087" min="1"
+                        max="65535">
                 </div>
 
                 <div class="config-row lattice-fields hidden">
                     <label for="latticeUrl">Lattice API URL:</label>
-                    <input type="text" id="latticeUrl" class="config-input" placeholder="https://your-sandbox.lattice.anduril.com">
+                    <input type="text" id="latticeUrl" class="config-input"
+                        placeholder="https://your-sandbox.lattice.anduril.com">
                 </div>
 
                 <div class="config-row lattice-fields hidden">
                     <label for="latticeToken">Environment Token:</label>
-                    <input type="password" id="latticeToken" class="config-input" placeholder="Environment 'Lattice Auth Token'">
-                    <small class="text-muted" style="font-size: 12px; display: block; margin-top: 4px;">Get from your environment details in Sandboxes</small>
+                    <input type="password" id="latticeToken" class="config-input"
+                        placeholder="Environment 'Lattice Auth Token'">
+                    <small class="text-muted" style="font-size: 12px; display: block; margin-top: 4px;">Get from your
+                        environment details in Sandboxes</small>
                 </div>
 
                 <div class="config-row lattice-fields hidden">
                     <label for="latticeSandboxToken">Sandbox Token:</label>
-                    <input type="password" id="latticeSandboxToken" class="config-input" placeholder="Account-level Sandboxes Bearer Token">
-                    <small class="text-muted" style="font-size: 12px; display: block; margin-top: 4px;">Create in Account & Security - Bearer tokens (only for Sandboxes)</small>
+                    <input type="password" id="latticeSandboxToken" class="config-input"
+                        placeholder="Account-level Sandboxes Bearer Token">
+                    <small class="text-muted" style="font-size: 12px; display: block; margin-top: 4px;">Create in
+                        Account & Security - Bearer tokens (only for Sandboxes)</small>
                 </div>
 
                 <div class="config-row lattice-fields hidden">
                     <label for="latticeIntegration">Integration Name:</label>
-                    <input type="text" id="latticeIntegration" class="config-input" placeholder="taiwan-cctv" value="taiwan-cctv">
+                    <input type="text" id="latticeIntegration" class="config-input" placeholder="taiwan-cctv"
+                        value="taiwan-cctv">
                 </div>
 
-                <div class="config-row chatsurfer-fields hidden">
-                    <label for="chatsurferSession">Session Cookie:</label>
-                    <input type="password" id="chatsurferSession" class="config-input" placeholder="SESSION cookie value from browser">
-                    <small class="text-muted" style="font-size: 12px; display: block; margin-top: 4px;">DevTools (F12) → Application → Cookies → SESSION</small>
-                </div>
 
                 <div class="config-row chatsurfer-fields hidden">
                     <label for="chatsurferRoom">Room Name:</label>
@@ -258,12 +269,14 @@
 
                 <div class="config-row chatsurfer-fields hidden">
                     <label for="chatsurferNickname">Bot Nickname:</label>
-                    <input type="text" id="chatsurferNickname" class="config-input" placeholder="CCTV_Bot" value="CCTV_Bot">
+                    <input type="text" id="chatsurferNickname" class="config-input" placeholder="CCTV_Bot"
+                        value="CCTV_Bot">
                 </div>
 
                 <div class="config-row chatsurfer-fields hidden">
                     <label for="chatsurferDomain">Domain ID:</label>
-                    <input type="text" id="chatsurferDomain" class="config-input" placeholder="chatsurferxmppunclass" value="chatsurferxmppunclass">
+                    <input type="text" id="chatsurferDomain" class="config-input" placeholder="chatsurferxmppunclass"
+                        value="chatsurferxmppunclass">
                 </div>
 
                 <div class="config-row">
@@ -307,9 +320,7 @@
                     </ul>
                     <p><strong>Authentication:</strong></p>
                     <ul>
-                        <li>Log in to ChatSurfer in your browser</li>
-                        <li>Open DevTools (F12) → Application → Cookies</li>
-                        <li>Copy the SESSION cookie value</li>
+                        <li>Uses CHATKEY API Key from configuration.</li>
                     </ul>
                 </div>
             </div>
@@ -465,15 +476,15 @@
                          aria-label="${englishDesc}, ${isWorking ? 'Online' : 'Offline'}${hasVehicles ? ', Vehicles detected' : ''}">
                         <div class="feed-thumbnail" id="thumb-${feed.id}">
                             ${isWorking ?
-                                `<img src="${API_URL}/api/feeds/${feed.id}/snapshot?t=${Date.now()}"
+                        `<img src="${API_URL}/api/feeds/${feed.id}/snapshot?t=${Date.now()}"
                                       alt="${englishDesc}"
                                       class="feed-stream"
                                       crossorigin="anonymous"
                                       data-feed-id="${feed.id}"
                                       loading="lazy">
                                  ${hasVehicles ? '<div class="vehicle-badge">TAI OCCUPIED</div>' : ''}` :
-                                ImageLoader.createOfflinePlaceholder()
-                            }
+                        ImageLoader.createOfflinePlaceholder()
+                    }
                         </div>
                         <div class="feed-info">
                             <div class="feed-title">${feed.roadName || 'Unknown'} ${feed.locationMile || ''}</div>
@@ -760,7 +771,6 @@
                 document.getElementById('latticeToken').value = config.latticeToken || '';
                 document.getElementById('latticeIntegration').value = config.latticeIntegration || 'taiwan-cctv';
                 // ChatSurfer fields
-                document.getElementById('chatsurferSession').value = config.chatsurferSession || '';
                 document.getElementById('chatsurferRoom').value = config.chatsurferRoom || '';
                 document.getElementById('chatsurferNickname').value = config.chatsurferNickname || 'CCTV_Bot';
                 document.getElementById('chatsurferDomain').value = config.chatsurferDomain || 'chatsurferxmppunclass';
@@ -814,7 +824,6 @@
                 latticeSandboxToken: document.getElementById('latticeSandboxToken').value,
                 latticeIntegration: document.getElementById('latticeIntegration').value,
                 // ChatSurfer fields
-                chatsurferSession: document.getElementById('chatsurferSession').value,
                 chatsurferRoom: document.getElementById('chatsurferRoom').value,
                 chatsurferNickname: document.getElementById('chatsurferNickname').value,
                 chatsurferDomain: document.getElementById('chatsurferDomain').value
@@ -1002,4 +1011,5 @@
         connectWebSocket();
     </script>
 </body>
+
 </html>
