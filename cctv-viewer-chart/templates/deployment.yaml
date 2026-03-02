@@ -48,7 +48,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}
-                  key: dod_CA.pem
+                  key: DOD_CA_PEM
             {{- end }}
           ports:
             - name: api
