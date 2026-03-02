@@ -44,11 +44,7 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
             {{- if .Values.existingSecret }}
-            - name: DOD_CA_PEM
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: DOD_CA_PEM
+            # Notice: Do not add DOD_CA_PEM here; we now securely mount the secret via volumes.
             {{- end }}
           ports:
             - name: api

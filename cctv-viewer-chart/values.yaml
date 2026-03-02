@@ -51,11 +51,17 @@ extraVolumes:
   - name: certs-volume
     secret:
       secretName: cosmic-npe
+  - name: dod-ca-volume
+    secret:
+      secretName: dod-ca-pem
 
 # Mount paths for extra volumes
 extraVolumeMounts:
   - name: certs-volume
     mountPath: "/certs"
+    readOnly: true
+  - name: dod-ca-volume
+    mountPath: "/ca-certs"
     readOnly: true
 
 service:
