@@ -404,7 +404,6 @@ Configure Stream Out integration
 {
   "enabled": true,
   "format": "chatsurfer",
-  "chatsurferSession": "your-session-cookie",
   "chatsurferRoom": "your-room-name",
   "chatsurferNickname": "CCTV_Bot",
   "chatsurferDomain": "chatsurferxmppunclass"
