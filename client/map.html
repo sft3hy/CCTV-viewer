@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -160,9 +161,17 @@
             box-shadow: var(--shadow-sm);
         }
 
-        .legend-dot.online { background: var(--color-success); }
-        .legend-dot.vehicles { background: var(--color-error); }
-        .legend-dot.offline { background: #9ca3af; }
+        .legend-dot.online {
+            background: var(--color-success);
+        }
+
+        .legend-dot.vehicles {
+            background: var(--color-error);
+        }
+
+        .legend-dot.offline {
+            background: #9ca3af;
+        }
 
         /* Connection Status */
         .map-connection {
@@ -204,8 +213,15 @@
         }
 
         @keyframes pulse-marker {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-            50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
         }
 
         /* Popup styles */
@@ -313,14 +329,15 @@
         }
     </style>
 </head>
+
 <body>
     <div class="map-header">
         <div class="map-header-left">
             <h1>Taiwan Highway CCTV Map</h1>
             <a href="index.html" class="btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                    <polyline points="9 22 9 12 15 12 15 22"/>
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
                 </svg>
                 Grid View
             </a>
@@ -391,11 +408,29 @@
     <script src="scripts/utils.js"></script>
 
     <script>
+        // ========================================
         // Configuration
+        // ========================================
         const hostname = window.location.hostname;
-        const API_BASE = `http://${hostname}:8001`;
-        const WS_URL = `ws://${hostname}:8001`;
 
+        let API_URL = `http://${hostname}:8001`;
+        let WS_URL = `ws://${hostname}:8001`;
+
+        if (window.location.port !== '8000') {
+            const protocol = window.location.protocol;
+            const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+            const basePath = window.location.pathname.split('/').slice(0, -1).join('/') || '';
+
+            API_URL = `${protocol}//${window.location.host}${basePath}`;
+            WS_URL = `${wsProtocol}//${window.location.host}${basePath}`;
+        }
+
+        // Define API_BASE as an alias for API_URL to not break existing references in the file
+        const API_BASE = API_URL;
+
+        const REFRESH_INTERVAL = 2000;
+        const MODAL_REFRESH_INTERVAL = 500;
+        const MAP_UPDATE_INTERVAL = 5000;
         // State
         let map;
         let markers = L.markerClusterGroup({
@@ -678,4 +713,5 @@
         setInterval(loadFeeds, 30000);
     </script>
 </body>
+
 </html>

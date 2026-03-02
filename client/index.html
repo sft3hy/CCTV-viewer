@@ -333,8 +333,26 @@
         // Configuration
         // ========================================
         const hostname = window.location.hostname;
-        const API_URL = `http://${hostname}:8001`;
-        const WS_URL = `ws://${hostname}:8001`;
+
+        // Use relative paths if we are on a subpath, otherwise default to port 8001
+        // In the k8s deployment with ingress, both frontend and backend are usually
+        // served on the same domain/port, and the ingress routes /cctv-viewer to frontend
+        // and /cctv-viewer/api to backend. 
+        // For local development, backend is on 8001.
+        let API_URL = `http://${hostname}:8001`;
+        let WS_URL = `ws://${hostname}:8001`;
+
+        // Check if we're running behind an ingress (port 80/443 typically, not 8000)
+        // or if we have a specific path
+        if (window.location.port !== '8000') {
+            const protocol = window.location.protocol;
+            const wsProtocol = protocol === 'https:' ? 'wss:' : 'ws:';
+            const basePath = window.location.pathname === '/' ? '' : window.location.pathname.replace(/\/$/, '');
+
+            API_URL = `${protocol}//${window.location.host}${basePath}`;
+            WS_URL = `${wsProtocol}//${window.location.host}${basePath}`;
+        }
+
         const REFRESH_INTERVAL = 2000;
         const MODAL_REFRESH_INTERVAL = 500;
         const SEARCH_DEBOUNCE_MS = 300;
