@@ -73,10 +73,10 @@ ingress:
   hosts:
     - host: test-cosmichorizon-worker-68a3110f01feebd0.elb.us-gov-west-1.amazonaws.com
       paths:
-        - path: /cctv-viewer/api(/|$)(.*)
+        - path: /cctv-viewer(/)(api/.*)
           pathType: ImplementationSpecific
           backendPort: 8001
-        - path: /cctv-viewer/ws(/|$)(.*)
+        - path: /cctv-viewer(/)(ws$|ws/.*)
           pathType: ImplementationSpecific
           backendPort: 8001
         - path: /cctv-viewer(/|$)(.*)
