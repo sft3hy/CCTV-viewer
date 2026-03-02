@@ -280,13 +280,14 @@ def generate_cot_message(feed: Dict) -> str:
     lon = feed.get("lon", "0.0")
 
     # Build CoT XML
+    base_url = settings.external_url.rstrip("/")
     cot_xml = f"""<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <event version='2.0' uid='{uid}' type='a-u-G' time='{time_str}' start='{time_str}' stale='{stale_str}' how='h-e'>
     <point lat='{lat}' lon='{lon}' hae='9999999.0' ce='9999999.0' le='9999999.0' />
     <detail>
         <contact callsign='{callsign}'/>
         <remarks>{remarks}</remarks>
-        <link uid='{uid}' type='video' url='http://localhost:8001/api/feeds/{uid}/snapshot'/>
+        <link uid='{uid}' type='video' url='{base_url}/api/feeds/{uid}/snapshot'/>
         <usericon iconsetpath='COT_MAPPING_2525B/a-u/a-u-G'/>
     </detail>
 </event>"""
@@ -539,14 +540,9 @@ def send_chatsurfer_message(feed: Dict, stream_cfg, annotated_image: bytes = Non
     message_parts.append(f"Time: {timestamp}")
 
     # Add snapshot URL
-    try:
-        server_ip = socket.gethostbyname(socket.gethostname())
-    except:
-        server_ip = "localhost"
     feed_id = feed["id"]
-    message_parts.append(
-        f"Snapshot: http://{server_ip}:8001/api/feeds/{feed_id}/snapshot"
-    )
+    base_url = settings.external_url.rstrip("/")
+    message_parts.append(f"Snapshot: {base_url}/api/feeds/{feed_id}/snapshot")
 
     message = "\n".join(message_parts)
 

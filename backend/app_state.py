@@ -1,6 +1,7 @@
 """
 Centralized app state - holds all shared data and components.
 """
+
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -12,13 +13,29 @@ try:
     from .tracker import TrackerManager
     from .websocket_manager import ConnectionManager
     from .core.cache import FeedCache
-    from .observability import MetricsCollector, HealthChecker, StructuredLogger, CircuitBreaker, AlertManager
+    from .observability import (
+        MetricsCollector,
+        HealthChecker,
+        StructuredLogger,
+        CircuitBreaker,
+        AlertManager,
+    )
+    from .core.config import get_settings
 except ImportError:
     from database import DatabaseManager
     from tracker import TrackerManager
     from websocket_manager import ConnectionManager
     from core.cache import FeedCache
-    from observability import MetricsCollector, HealthChecker, StructuredLogger, CircuitBreaker, AlertManager
+    from observability import (
+        MetricsCollector,
+        HealthChecker,
+        StructuredLogger,
+        CircuitBreaker,
+        AlertManager,
+    )
+    from core.config import get_settings
+
+settings = get_settings()
 
 
 @dataclass
@@ -35,7 +52,7 @@ class StreamConfig:
     chatsurferRoom: str = ""
     chatsurferNickname: str = "CCTV_Bot"
     chatsurferDomain: str = "chatsurferxmppunclass"
-    chatsurferServerUrl: str = "http://localhost:8001"
+    chatsurferServerUrl: str = settings.external_url
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -126,7 +143,7 @@ class AppState:
 
     def get_feed_by_id(self, feed_id: str) -> Optional[Dict]:
         with self._feeds_lock:
-            return next((f for f in self._feeds_data if f['id'] == feed_id), None)
+            return next((f for f in self._feeds_data if f["id"] == feed_id), None)
 
     @property
     def feeds_count(self) -> int:
@@ -170,8 +187,13 @@ class AppState:
             return self.feed_cache.get_image(feed_id)
         return None
 
-    def cache_image(self, feed_id: str, image_bytes: bytes,
-                    is_working: bool = True, has_vehicles: bool = False):
+    def cache_image(
+        self,
+        feed_id: str,
+        image_bytes: bytes,
+        is_working: bool = True,
+        has_vehicles: bool = False,
+    ):
         if self.feed_cache:
             self.feed_cache.set_image(feed_id, image_bytes, is_working, has_vehicles)
 
@@ -194,7 +216,9 @@ class AppState:
                 return True
             return current_time >= retry_after
 
-    def set_feed_backoff(self, feed_id: str, current_time: float, backoff_seconds: float):
+    def set_feed_backoff(
+        self, feed_id: str, current_time: float, backoff_seconds: float
+    ):
         with self._retry_lock:
             self._feed_retry_after[feed_id] = current_time + backoff_seconds
 
@@ -203,7 +227,9 @@ class AppState:
             self._feed_retry_after.pop(feed_id, None)
             self._feed_retry_after.pop(f"{feed_id}_interval", None)
 
-    def get_backoff_interval(self, feed_id: str, default: float = 15.0, max_backoff: float = 300.0) -> float:
+    def get_backoff_interval(
+        self, feed_id: str, default: float = 15.0, max_backoff: float = 300.0
+    ) -> float:
         with self._retry_lock:
             current = self._feed_retry_after.get(f"{feed_id}_interval", default)
             next_interval = min(current * 2, max_backoff)
@@ -245,11 +271,18 @@ class AppState:
 
             new_config = self._stream_config.to_dict()
 
-            self._log_audit("stream_config_update", {
-                "old": old_config,
-                "new": new_config,
-                "changed_fields": [k for k in kwargs.keys() if old_config.get(k) != new_config.get(k)]
-            })
+            self._log_audit(
+                "stream_config_update",
+                {
+                    "old": old_config,
+                    "new": new_config,
+                    "changed_fields": [
+                        k
+                        for k in kwargs.keys()
+                        if old_config.get(k) != new_config.get(k)
+                    ],
+                },
+            )
 
             return self._stream_config
 
@@ -260,7 +293,7 @@ class AppState:
             entry = {
                 "timestamp": datetime.utcnow().isoformat(),
                 "action": action,
-                "details": details
+                "details": details,
             }
             self._audit_log.append(entry)
 
@@ -309,7 +342,7 @@ class AppState:
 
     def is_initialized(self) -> bool:
         return (
-            self.yolo_model is not None and
-            self.feed_cache is not None and
-            self.feeds_count > 0
+            self.yolo_model is not None
+            and self.feed_cache is not None
+            and self.feeds_count > 0
         )

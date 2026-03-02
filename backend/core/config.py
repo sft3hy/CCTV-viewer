@@ -138,6 +138,7 @@ class Settings(BaseSettings):
     # Server
     host: str = Field(default="0.0.0.0", alias="CCTV_HOST")
     port: int = Field(default=8001, alias="CCTV_PORT")
+    external_url: str = Field(default="http://localhost:8001", alias="EXTERNAL_URL")
 
     # Detection
     detection: DetectionSettings = Field(default_factory=DetectionSettings)

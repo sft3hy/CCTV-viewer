@@ -45,10 +45,10 @@ spec:
             {{- end }}
           ports:
             - name: api
-              containerPort: 8000
+              containerPort: 8001
               protocol: TCP
             - name: web
-              containerPort: 8001
+              containerPort: 8000
               protocol: TCP
           livenessProbe:
             httpGet:
