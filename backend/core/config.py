@@ -1,6 +1,7 @@
 """
 Configuration management for CCTV Viewer
 """
+
 import os
 from pathlib import Path
 from functools import lru_cache
@@ -13,12 +14,12 @@ from pydantic_settings import BaseSettings
 
 def load_config() -> dict:
     """Load configuration from config.yaml"""
-    config_path = Path(__file__).parent.parent.parent / 'config.yaml'
+    config_path = Path(__file__).parent.parent.parent / "config.yaml"
     if not config_path.exists():
         print(f"Warning: config.yaml not found at {config_path}, using defaults")
         return {}
 
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
     print(f"Configuration loaded from {config_path}")
@@ -31,6 +32,7 @@ CONFIG = load_config()
 
 class DetectionSettings(BaseModel):
     """Detection configuration"""
+
     confidence_threshold: float = 0.6
     min_box_size: int = 20
     vehicle_classes: List[int] = [2, 5, 7]  # car, bus, truck
@@ -38,6 +40,7 @@ class DetectionSettings(BaseModel):
 
 class TrackingSettings(BaseModel):
     """Tracking configuration"""
+
     enabled: bool = True
     max_age: int = 30
     min_hits: int = 3
@@ -46,6 +49,7 @@ class TrackingSettings(BaseModel):
 
 class PerformanceSettings(BaseModel):
     """Performance configuration"""
+
     batch_size: int = 50
     worker_threads: int = 8
     selective_skip_interval: int = 2
@@ -53,6 +57,7 @@ class PerformanceSettings(BaseModel):
 
 class HttpSettings(BaseModel):
     """HTTP client configuration"""
+
     max_connections: int = 300
     max_keepalive: int = 250
     keepalive_expiry: int = 60
@@ -62,6 +67,7 @@ class HttpSettings(BaseModel):
 
 class DatabaseSettings(BaseModel):
     """Database configuration"""
+
     enabled: bool = True
     type: str = "sqlite"
     path: str = "./data/cctv_data.db"
@@ -74,6 +80,7 @@ class DatabaseSettings(BaseModel):
 
 class WebSocketSettings(BaseModel):
     """WebSocket configuration"""
+
     enabled: bool = True
     heartbeat_interval: int = 30
     max_connections: int = 100
@@ -81,6 +88,7 @@ class WebSocketSettings(BaseModel):
 
 class APISettings(BaseModel):
     """API configuration"""
+
     enable_cors: bool = True
     enable_gzip: bool = True
     rate_limit: int = 100
@@ -90,12 +98,14 @@ class APISettings(BaseModel):
 
 class AlertSettings(BaseModel):
     """Alert configuration"""
+
     enabled: bool = False
     cooldown_seconds: int = 300
 
 
 class LoggingSettings(BaseModel):
     """Logging configuration"""
+
     level: str = "INFO"
     format: str = "json"
     file: Optional[str] = None
@@ -105,6 +115,7 @@ class LoggingSettings(BaseModel):
 
 class StreamOutSettings(BaseModel):
     """Stream out configuration"""
+
     enabled: bool = False
     format: str = "cot"
 
@@ -305,3 +316,24 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Get cached settings instance"""
     return Settings()
+
+
+CHATKEY = os.environ.get("CHATKEY", "")
+TEST = os.environ.get("TEST_LOCAL", "False")
+
+# Certificate paths - prioritize environment variables if injected via Rancher Secret
+if TEST == "True":
+    CERT_PATH = os.environ.get(
+        "CCTV_CERT_PATH", "/Users/samueltownsend/dev/certs/justcert.pem"
+    )
+    KEY_PATH = os.environ.get(
+        "CCTV_KEY_PATH", "/Users/samueltownsend/dev/certs/decrypted.key"
+    )
+    CA_BUNDLE_PATH = os.environ.get(
+        "CCTV_CA_BUNDLE_PATH", "/Users/samueltownsend/dev/certs/dod_CAs.pem"
+    )
+else:
+    # Use mounted TLS secret by default in production
+    CERT_PATH = os.environ.get("CCTV_CERT_PATH", "/certs/tls.crt")
+    KEY_PATH = os.environ.get("CCTV_KEY_PATH", "/certs/tls.key")
+    CA_BUNDLE_PATH = os.environ.get("CCTV_CA_BUNDLE_PATH", "/certs/dod_CA.pem")
