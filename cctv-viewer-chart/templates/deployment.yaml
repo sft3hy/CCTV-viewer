@@ -44,7 +44,7 @@ spec:
               value: {{ $value | quote }}
             {{- end }}
             {{- if .Values.existingSecret }}
-            - name: dod_CA.pem
+            - name: DOD_CA_PEM
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.existingSecret }}

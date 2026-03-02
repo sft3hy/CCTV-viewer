@@ -338,7 +338,7 @@ else:
     CERT_PATH = os.environ.get("CCTV_CERT_PATH", "/certs/tls.crt")
     KEY_PATH = os.environ.get("CCTV_KEY_PATH", "/certs/tls.key")
 
-    ca_content = os.environ.get("dod_CA.pem")
+    ca_content = os.environ.get("DOD_CA_PEM")
     if ca_content:
         # Write the CA bundle string from the environment variable to a file
         # because requests.post() verify= parameter requires a file path
