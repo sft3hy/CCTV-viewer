@@ -10,6 +10,15 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+global:
+  storageClass: "cosmichorizon-ebs-sc-retain"
+  storageClassShared: "cosmichorizon-efs-sc"
+  testMode: "False"
+  persistence:
+    enabled: true 
+  ephemeralMode: false
+  authMode: "HYBRID"
+
 serviceAccount:
   create: true
   annotations: {}
