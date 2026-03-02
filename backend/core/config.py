@@ -337,4 +337,19 @@ else:
     # Use mounted TLS secret by default in production
     CERT_PATH = os.environ.get("CCTV_CERT_PATH", "/certs/tls.crt")
     KEY_PATH = os.environ.get("CCTV_KEY_PATH", "/certs/tls.key")
-    CA_BUNDLE_PATH = os.environ.get("CCTV_CA_BUNDLE_PATH", "/certs/dod_CA.pem")
+
+    ca_content = os.environ.get("dod_CA.pem")
+    if ca_content:
+        # Write the CA bundle string from the environment variable to a file
+        # because requests.post() verify= parameter requires a file path
+        temp_ca_path = "/tmp/dod_CA.pem"
+        try:
+            with open(temp_ca_path, "w") as f:
+                f.write(ca_content)
+            CA_BUNDLE_PATH = temp_ca_path
+        except Exception as e:
+            print(f"Warning: Failed to write CA bundle to {temp_ca_path}: {e}")
+            CA_BUNDLE_PATH = os.environ.get("CCTV_CA_BUNDLE_PATH", "/certs/dod_CA.pem")
+    else:
+        # Fallback to the mounted file if the environment variable is not present
+        CA_BUNDLE_PATH = os.environ.get("CCTV_CA_BUNDLE_PATH", "/certs/dod_CA.pem")
