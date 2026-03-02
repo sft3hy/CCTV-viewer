@@ -41,26 +41,39 @@ from PIL import Image
 from ultralytics import YOLO
 import cv2
 
+from core.config import CHATKEY, CERT_PATH, KEY_PATH, CA_BUNDLE_PATH
+
 # Import our modules
 try:
     from .database import DatabaseManager
     from .tracker import TrackerManager, Detection as TrackerDetection
     from .websocket_manager import ConnectionManager, handle_websocket_messages
     from .observability import (
-        MetricsCollector, HealthChecker, StructuredLogger,
-        CircuitBreaker, AlertManager
+        MetricsCollector,
+        HealthChecker,
+        StructuredLogger,
+        CircuitBreaker,
+        AlertManager,
     )
     from .middleware import (
-        APIKeyMiddleware, RateLimitMiddleware, ErrorHandlerMiddleware,
-        RequestLoggingMiddleware
+        APIKeyMiddleware,
+        RateLimitMiddleware,
+        ErrorHandlerMiddleware,
+        RequestLoggingMiddleware,
     )
     from .middleware.error_handler import (
-        custom_http_exception_handler, custom_validation_exception_handler
+        custom_http_exception_handler,
+        custom_validation_exception_handler,
     )
     from .schemas import (
-        StreamConfigRequest, StreamConfigResponse,
-        SearchResponse, FeedHistoryResponse, FeedStatsResponse,
-        StatsResponse, HealthResponse, ErrorResponse
+        StreamConfigRequest,
+        StreamConfigResponse,
+        SearchResponse,
+        FeedHistoryResponse,
+        FeedStatsResponse,
+        StatsResponse,
+        HealthResponse,
+        ErrorResponse,
     )
     from .app_state import AppState, StreamConfig
     from .core.cache import FeedCache
@@ -71,20 +84,31 @@ except ImportError:
     from tracker import TrackerManager, Detection as TrackerDetection
     from websocket_manager import ConnectionManager, handle_websocket_messages
     from observability import (
-        MetricsCollector, HealthChecker, StructuredLogger,
-        CircuitBreaker, AlertManager
+        MetricsCollector,
+        HealthChecker,
+        StructuredLogger,
+        CircuitBreaker,
+        AlertManager,
     )
     from middleware import (
-        APIKeyMiddleware, RateLimitMiddleware, ErrorHandlerMiddleware,
-        RequestLoggingMiddleware
+        APIKeyMiddleware,
+        RateLimitMiddleware,
+        ErrorHandlerMiddleware,
+        RequestLoggingMiddleware,
     )
     from middleware.error_handler import (
-        custom_http_exception_handler, custom_validation_exception_handler
+        custom_http_exception_handler,
+        custom_validation_exception_handler,
     )
     from schemas import (
-        StreamConfigRequest, StreamConfigResponse,
-        SearchResponse, FeedHistoryResponse, FeedStatsResponse,
-        StatsResponse, HealthResponse, ErrorResponse
+        StreamConfigRequest,
+        StreamConfigResponse,
+        SearchResponse,
+        FeedHistoryResponse,
+        FeedStatsResponse,
+        StatsResponse,
+        HealthResponse,
+        ErrorResponse,
     )
     from app_state import AppState, StreamConfig
     from core.cache import FeedCache
@@ -97,14 +121,15 @@ from prometheus_client import make_asgi_app
 # Configuration Loading with Pydantic Validation
 # =============================================================================
 
+
 def load_config() -> dict:
     """Load configuration from config.yaml"""
-    config_path = Path(__file__).parent.parent / 'config.yaml'
+    config_path = Path(__file__).parent.parent / "config.yaml"
     if not config_path.exists():
         print(f"Warning: config.yaml not found at {config_path}, using defaults")
         return {}
 
-    with open(config_path, 'r') as f:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
     print(f"✓ Configuration loaded from {config_path}")
@@ -131,9 +156,13 @@ app_state = AppState()
 
 # Initialize observability components on app_state
 app_state.metrics = MetricsCollector()
-app_state.logger = StructuredLogger("cctv.main", log_level=CONFIG.get('logging', {}).get('level', 'INFO'))
+app_state.logger = StructuredLogger(
+    "cctv.main", log_level=CONFIG.get("logging", {}).get("level", "INFO")
+)
 app_state.alert_manager = AlertManager(CONFIG)
-app_state.feed_circuit_breaker = CircuitBreaker(failure_threshold=10, recovery_timeout=300.0)
+app_state.feed_circuit_breaker = CircuitBreaker(
+    failure_threshold=10, recovery_timeout=300.0
+)
 
 # Convenience references (for backward compatibility during transition)
 logger = app_state.logger
@@ -141,14 +170,17 @@ metrics = app_state.metrics
 alert_manager = app_state.alert_manager
 
 # Detection settings from config
-VEHICLE_CLASSES = CONFIG.get('detection', {}).get('vehicle_classes', [2, 5, 7])
-MIN_BOX_SIZE = CONFIG.get('detection', {}).get('min_box_size', 20)
-CONFIDENCE_THRESHOLD = CONFIG.get('detection', {}).get('confidence_threshold', 0.6)
-SELECTIVE_SKIP_INTERVAL = CONFIG.get('performance', {}).get('selective_skip_interval', 2)
+VEHICLE_CLASSES = CONFIG.get("detection", {}).get("vehicle_classes", [2, 5, 7])
+MIN_BOX_SIZE = CONFIG.get("detection", {}).get("min_box_size", 20)
+CONFIDENCE_THRESHOLD = CONFIG.get("detection", {}).get("confidence_threshold", 0.6)
+SELECTIVE_SKIP_INTERVAL = CONFIG.get("performance", {}).get(
+    "selective_skip_interval", 2
+)
 
 # =============================================================================
 # SSL Configuration
 # =============================================================================
+
 
 def create_ssl_context(verify: bool = True) -> ssl.SSLContext:
     """
@@ -187,6 +219,7 @@ app_state.ssl_context = ssl_context
 # GPU Auto-Detection for YOLO
 # =============================================================================
 
+
 def detect_device() -> str:
     """
     Auto-detect the best available device for YOLO inference.
@@ -196,57 +229,58 @@ def detect_device() -> str:
     """
     try:
         import torch
+
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             logger.info(f"GPU detected: {gpu_name}")
-            return 'cuda'
-        elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
+            return "cuda"
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
             logger.info("Apple Silicon GPU (MPS) detected")
-            return 'mps'
+            return "mps"
         else:
             logger.info("No GPU detected, using CPU")
-            return 'cpu'
+            return "cpu"
     except ImportError:
         logger.warning("PyTorch not found, defaulting to CPU")
-        return 'cpu'
+        return "cpu"
     except Exception as e:
         logger.warning(f"Error detecting GPU: {e}, defaulting to CPU")
-        return 'cpu'
+        return "cpu"
 
 
 def generate_cot_message(feed: Dict) -> str:
     """Generate a CoT XML message for a camera with vehicle detection"""
     # Generate ISO 8601 timestamp with milliseconds
     now = datetime.now(timezone.utc)
-    time_str = now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    time_str = now.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     # Stale time (1 hour from now)
     stale_time = datetime.fromtimestamp(now.timestamp() + 3600, timezone.utc)
-    stale_str = stale_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+    stale_str = stale_time.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
     # Use feed ID as UID
-    uid = feed['id']
+    uid = feed["id"]
 
     # Callsign: TrafficCam-{ID}
     callsign = f"TrafficCam-{feed['id']}"
 
     # Build remarks with location info
     remarks_parts = []
-    if feed.get('roadName'):
+    if feed.get("roadName"):
         remarks_parts.append(f"Road: {feed['roadName']}")
-    if feed.get('locationMile'):
+    if feed.get("locationMile"):
         remarks_parts.append(f"Location: {feed['locationMile']}")
-    if feed.get('description'):
-        remarks_parts.append(feed['description'])
+    if feed.get("description"):
+        remarks_parts.append(feed["description"])
     remarks_parts.append("Vehicle Detected")
     remarks = " | ".join(remarks_parts)
 
     # Get lat/lon
-    lat = feed.get('lat', '0.0')
-    lon = feed.get('lon', '0.0')
+    lat = feed.get("lat", "0.0")
+    lon = feed.get("lon", "0.0")
 
     # Build CoT XML
-    cot_xml = f'''<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
+    cot_xml = f"""<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
 <event version='2.0' uid='{uid}' type='a-u-G' time='{time_str}' start='{time_str}' stale='{stale_str}' how='h-e'>
     <point lat='{lat}' lon='{lon}' hae='9999999.0' ce='9999999.0' le='9999999.0' />
     <detail>
@@ -255,7 +289,7 @@ def generate_cot_message(feed: Dict) -> str:
         <link uid='{uid}' type='video' url='http://localhost:8001/api/feeds/{uid}/snapshot'/>
         <usericon iconsetpath='COT_MAPPING_2525B/a-u/a-u-G'/>
     </detail>
-</event>'''
+</event>"""
 
     return cot_xml
 
@@ -264,13 +298,15 @@ def send_cot_udp(message: str, ip: str, port: int):
     """Send CoT message via UDP"""
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(message.encode('utf-8'), (ip, port))
+        sock.sendto(message.encode("utf-8"), (ip, port))
         sock.close()
     except Exception as e:
         print(f"Error sending CoT message: {e}")
 
 
-def publish_lattice_entity(feed: Dict, integration_name: str, annotated_image: bytes = None):
+def publish_lattice_entity(
+    feed: Dict, integration_name: str, annotated_image: bytes = None
+):
     """Publish entity to Lattice with vehicle detection and image"""
     global lattice_client
 
@@ -279,28 +315,38 @@ def publish_lattice_entity(feed: Dict, integration_name: str, annotated_image: b
         return
 
     try:
-        from anduril import Location, Position, Aliases, Provenance, Ontology, MilView, Media, MediaItem, Enu
+        from anduril import (
+            Location,
+            Position,
+            Aliases,
+            Provenance,
+            Ontology,
+            MilView,
+            Media,
+            MediaItem,
+            Enu,
+        )
         from datetime import timedelta
         import math
 
         # Parse lat/lon
-        lat = float(feed.get('lat', '0.0'))
-        lon = float(feed.get('lon', '0.0'))
+        lat = float(feed.get("lat", "0.0"))
+        lon = float(feed.get("lon", "0.0"))
 
         # Create entity name/description
         name_parts = []
-        if feed.get('roadName'):
-            name_parts.append(feed['roadName'])
-        if feed.get('locationMile'):
-            name_parts.append(feed['locationMile'])
-        entity_name = " - ".join(name_parts) if name_parts else feed['id']
+        if feed.get("roadName"):
+            name_parts.append(feed["roadName"])
+        if feed.get("locationMile"):
+            name_parts.append(feed["locationMile"])
+        entity_name = " - ".join(name_parts) if name_parts else feed["id"]
 
         description = f"Traffic Camera: {entity_name} | Vehicle Detected"
 
         now = datetime.now(timezone.utc)
         expiry = now + timedelta(hours=1)
 
-        entity_id = feed['id']
+        entity_id = feed["id"]
         entity_name_alias = f"TrafficCam-{entity_id}"
 
         print(f"Publishing entity {entity_id} to Lattice...")
@@ -317,8 +363,7 @@ def publish_lattice_entity(feed: Dict, integration_name: str, annotated_image: b
                 object_path = f"{integration_name}-{entity_id}-{now.strftime('%Y%m%d_%H%M%S')}.jpg"
 
                 lattice_client.objects.upload_object(
-                    object_path=object_path,
-                    request=annotated_image
+                    object_path=object_path, request=annotated_image
                 )
 
                 # Reference the uploaded object in Media
@@ -328,31 +373,33 @@ def publish_lattice_entity(feed: Dict, integration_name: str, annotated_image: b
                     media=[
                         MediaItem(
                             type="MEDIA_TYPE_IMAGE",
-                            relative_path=f"api/v1/objects/{object_path}"
+                            relative_path=f"api/v1/objects/{object_path}",
                         )
                     ]
                 )
-                print(f"  📷 Uploaded detection image to {object_path} ({len(annotated_image)} bytes)")
+                print(
+                    f"  📷 Uploaded detection image to {object_path} ({len(annotated_image)} bytes)"
+                )
             except Exception as img_error:
                 print(f"  ⚠ Failed to upload image: {img_error}")
 
         # Calculate unit velocity vector based on road direction for heading indication
         # We only know direction, not speed, so use unit vector (magnitude=1) for heading only
-        direction = feed.get('direction', '').upper()
+        direction = feed.get("direction", "").upper()
         velocity_enu = None
         if direction:
             # Map direction to unit velocity vector (magnitude = 1.0)
             # ENU: East-North-Up coordinate system
             # Using unit vector since we don't have actual speed data
             direction_map = {
-                'E': Enu(e=1.0, n=0.0, u=0.0),      # East
-                'W': Enu(e=-1.0, n=0.0, u=0.0),     # West
-                'N': Enu(e=0.0, n=1.0, u=0.0),      # North
-                'S': Enu(e=0.0, n=-1.0, u=0.0),     # South
-                'NE': Enu(e=1.0/math.sqrt(2), n=1.0/math.sqrt(2), u=0.0),
-                'NW': Enu(e=-1.0/math.sqrt(2), n=1.0/math.sqrt(2), u=0.0),
-                'SE': Enu(e=1.0/math.sqrt(2), n=-1.0/math.sqrt(2), u=0.0),
-                'SW': Enu(e=-1.0/math.sqrt(2), n=-1.0/math.sqrt(2), u=0.0),
+                "E": Enu(e=1.0, n=0.0, u=0.0),  # East
+                "W": Enu(e=-1.0, n=0.0, u=0.0),  # West
+                "N": Enu(e=0.0, n=1.0, u=0.0),  # North
+                "S": Enu(e=0.0, n=-1.0, u=0.0),  # South
+                "NE": Enu(e=1.0 / math.sqrt(2), n=1.0 / math.sqrt(2), u=0.0),
+                "NW": Enu(e=-1.0 / math.sqrt(2), n=1.0 / math.sqrt(2), u=0.0),
+                "SE": Enu(e=1.0 / math.sqrt(2), n=-1.0 / math.sqrt(2), u=0.0),
+                "SW": Enu(e=-1.0 / math.sqrt(2), n=-1.0 / math.sqrt(2), u=0.0),
             }
             velocity_enu = direction_map.get(direction)
             if velocity_enu:
@@ -367,39 +414,34 @@ def publish_lattice_entity(feed: Dict, integration_name: str, annotated_image: b
             expiry_time=expiry,
             location=Location(
                 position=Position(
-                    latitude_degrees=lat,
-                    longitude_degrees=lon,
-                    altitude_hae_meters=0.0
+                    latitude_degrees=lat, longitude_degrees=lon, altitude_hae_meters=0.0
                 ),
-                velocity_enu=velocity_enu  # Unit vector for heading only, no speed data
+                velocity_enu=velocity_enu,  # Unit vector for heading only, no speed data
             ),
-            aliases=Aliases(
-                name=entity_name_alias
-            ),
-            ontology=Ontology(
-                template="TEMPLATE_TRACK",
-                platform_type="VEHICLE"
-            ),
+            aliases=Aliases(name=entity_name_alias),
+            ontology=Ontology(template="TEMPLATE_TRACK", platform_type="VEHICLE"),
             mil_view=MilView(
-                disposition="DISPOSITION_UNKNOWN",
-                environment="ENVIRONMENT_SURFACE"
+                disposition="DISPOSITION_UNKNOWN", environment="ENVIRONMENT_SURFACE"
             ),
             provenance=Provenance(
                 integration_name=integration_name,
                 data_type="CCTV",
-                source_update_time=now
+                source_update_time=now,
             ),
-            media=media
+            media=media,
         )
 
         print(f"✓ Successfully published entity {entity_id}")
     except Exception as e:
         print(f"✗ Error publishing to Lattice: {e}")
         import traceback
+
         print(f"  Traceback: {traceback.format_exc()}")
 
 
-def initialize_lattice_client(env_token: str, sandbox_token: str = None, base_url: str = None):
+def initialize_lattice_client(
+    env_token: str, sandbox_token: str = None, base_url: str = None
+):
     """
     Initialize Lattice client with tokens
 
@@ -416,7 +458,9 @@ def initialize_lattice_client(env_token: str, sandbox_token: str = None, base_ur
         from anduril import Lattice
 
         # Debug: Check if tokens are provided
-        env_token_preview = f"{env_token[:10]}..." if len(env_token) > 10 else "EMPTY/SHORT"
+        env_token_preview = (
+            f"{env_token[:10]}..." if len(env_token) > 10 else "EMPTY/SHORT"
+        )
         print(f"Initializing Lattice with environment token: {env_token_preview}")
 
         # Ensure base_url uses HTTPS
@@ -429,10 +473,18 @@ def initialize_lattice_client(env_token: str, sandbox_token: str = None, base_ur
         custom_headers = {}
         if base_url and "sandbox" in base_url.lower():
             if sandbox_token:
-                sandbox_token_preview = f"{sandbox_token[:10]}..." if len(sandbox_token) > 10 else "EMPTY/SHORT"
-                print(f"Detected sandbox environment - using sandbox token: {sandbox_token_preview}")
+                sandbox_token_preview = (
+                    f"{sandbox_token[:10]}..."
+                    if len(sandbox_token) > 10
+                    else "EMPTY/SHORT"
+                )
+                print(
+                    f"Detected sandbox environment - using sandbox token: {sandbox_token_preview}"
+                )
                 # IMPORTANT: Sandbox token also needs "Bearer " prefix!
-                custom_headers["anduril-sandbox-authorization"] = f"Bearer {sandbox_token}"
+                custom_headers["anduril-sandbox-authorization"] = (
+                    f"Bearer {sandbox_token}"
+                )
             else:
                 print("⚠ Warning: Sandbox URL detected but no sandbox token provided!")
 
@@ -441,15 +493,10 @@ def initialize_lattice_client(env_token: str, sandbox_token: str = None, base_ur
             if base_url:
                 print(f"Using base_url: {base_url}")
                 lattice_client = Lattice(
-                    token=env_token,
-                    base_url=base_url,
-                    headers=custom_headers
+                    token=env_token, base_url=base_url, headers=custom_headers
                 )
             else:
-                lattice_client = Lattice(
-                    token=env_token,
-                    headers=custom_headers
-                )
+                lattice_client = Lattice(token=env_token, headers=custom_headers)
         else:
             # Standard initialization for production environments
             if base_url:
@@ -469,27 +516,26 @@ def send_chatsurfer_message(feed: Dict, stream_cfg, annotated_image: bytes = Non
     """Send detection message to ChatSurfer with snapshot URL"""
     import requests
 
-    url = "https://chatsurfer.nro.mil/api/chatserver/message"
+    url = f"https://chatsurfer.nro.mil/api/chatserver/message?api-key={CHATKEY}"
     headers = {
-        "cookie": f"SESSION={stream_cfg.chatsurferSession}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     # Build message content
     message_parts = ["[VEHICLE DETECTION]"]
 
-    if feed.get('roadName'):
+    if feed.get("roadName"):
         message_parts.append(f"Road: {feed['roadName']}")
-    if feed.get('locationMile'):
+    if feed.get("locationMile"):
         message_parts.append(f"Location: {feed['locationMile']}")
 
     message_parts.append(f"Camera: {feed['id']}")
 
-    if feed.get('lat') and feed.get('lon'):
+    if feed.get("lat") and feed.get("lon"):
         message_parts.append(f"Coords: {feed['lat']}, {feed['lon']}")
 
     # Add timestamp
-    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     message_parts.append(f"Time: {timestamp}")
 
     # Add snapshot URL
@@ -497,8 +543,10 @@ def send_chatsurfer_message(feed: Dict, stream_cfg, annotated_image: bytes = Non
         server_ip = socket.gethostbyname(socket.gethostname())
     except:
         server_ip = "localhost"
-    feed_id = feed['id']
-    message_parts.append(f"Snapshot: http://{server_ip}:8001/api/feeds/{feed_id}/snapshot")
+    feed_id = feed["id"]
+    message_parts.append(
+        f"Snapshot: http://{server_ip}:8001/api/feeds/{feed_id}/snapshot"
+    )
 
     message = "\n".join(message_parts)
 
@@ -507,11 +555,17 @@ def send_chatsurfer_message(feed: Dict, stream_cfg, annotated_image: bytes = Non
         "message": message,
         "domainId": stream_cfg.chatsurferDomain,
         "nickName": stream_cfg.chatsurferNickname,
-        "roomName": stream_cfg.chatsurferRoom
+        "roomName": stream_cfg.chatsurferRoom,
     }
-
     try:
-        response = requests.post(url, headers=headers, json=payload, verify=False, timeout=10)
+        response = requests.post(
+            url,
+            headers=headers,
+            cert=(CERT_PATH, KEY_PATH),
+            verify=CA_BUNDLE_PATH,
+            json=payload,
+            timeout=10,
+        )
         if response.status_code == 204:
             print(f"✓ ChatSurfer message sent for feed {feed['id']}")
         else:
@@ -522,34 +576,70 @@ def send_chatsurfer_message(feed: Dict, stream_cfg, annotated_image: bytes = Non
 
 async def fetch_feed_list():
     """Fetch and parse the XML feed list from Taiwan Highway Bureau"""
-    url = 'https://cctv-maintain.thb.gov.tw/opendataCCTVs.xml'
+    url = "https://cctv-maintain.thb.gov.tw/opendataCCTVs.xml"
 
     # Use shared SSL context for proper verification
     async with httpx.AsyncClient(verify=ssl_context, timeout=30.0) as client:
         try:
-            response = await client.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            response = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
             response.raise_for_status()
 
             # Parse XML
             root = ET.fromstring(response.text)
 
             # Extract namespace
-            ns = {'ns': 'http://traffic.transportdata.tw/standard/traffic/schema/'}
+            ns = {"ns": "http://traffic.transportdata.tw/standard/traffic/schema/"}
 
             feeds = []
-            for cctv in root.findall('.//ns:CCTV', ns):
+            for cctv in root.findall(".//ns:CCTV", ns):
                 feed = {
-                    'id': cctv.find('ns:CCTVID', ns).text if cctv.find('ns:CCTVID', ns) is not None else '',
-                    'streamUrl': cctv.find('ns:VideoStreamURL', ns).text if cctv.find('ns:VideoStreamURL', ns) is not None else '',
-                    'imageUrl': cctv.find('ns:VideoImageURL', ns).text if cctv.find('ns:VideoImageURL', ns) is not None else '',
-                    'description': cctv.find('ns:SurveillanceDescription', ns).text if cctv.find('ns:SurveillanceDescription', ns) is not None else '',
-                    'roadName': cctv.find('ns:RoadName', ns).text if cctv.find('ns:RoadName', ns) is not None else '',
-                    'locationMile': cctv.find('ns:LocationMile', ns).text if cctv.find('ns:LocationMile', ns) is not None else '',
-                    'lat': cctv.find('ns:PositionLat', ns).text if cctv.find('ns:PositionLat', ns) is not None else '',
-                    'lon': cctv.find('ns:PositionLon', ns).text if cctv.find('ns:PositionLon', ns) is not None else '',
-                    'direction': cctv.find('ns:RoadDirection', ns).text if cctv.find('ns:RoadDirection', ns) is not None else '',
+                    "id": (
+                        cctv.find("ns:CCTVID", ns).text
+                        if cctv.find("ns:CCTVID", ns) is not None
+                        else ""
+                    ),
+                    "streamUrl": (
+                        cctv.find("ns:VideoStreamURL", ns).text
+                        if cctv.find("ns:VideoStreamURL", ns) is not None
+                        else ""
+                    ),
+                    "imageUrl": (
+                        cctv.find("ns:VideoImageURL", ns).text
+                        if cctv.find("ns:VideoImageURL", ns) is not None
+                        else ""
+                    ),
+                    "description": (
+                        cctv.find("ns:SurveillanceDescription", ns).text
+                        if cctv.find("ns:SurveillanceDescription", ns) is not None
+                        else ""
+                    ),
+                    "roadName": (
+                        cctv.find("ns:RoadName", ns).text
+                        if cctv.find("ns:RoadName", ns) is not None
+                        else ""
+                    ),
+                    "locationMile": (
+                        cctv.find("ns:LocationMile", ns).text
+                        if cctv.find("ns:LocationMile", ns) is not None
+                        else ""
+                    ),
+                    "lat": (
+                        cctv.find("ns:PositionLat", ns).text
+                        if cctv.find("ns:PositionLat", ns) is not None
+                        else ""
+                    ),
+                    "lon": (
+                        cctv.find("ns:PositionLon", ns).text
+                        if cctv.find("ns:PositionLon", ns) is not None
+                        else ""
+                    ),
+                    "direction": (
+                        cctv.find("ns:RoadDirection", ns).text
+                        if cctv.find("ns:RoadDirection", ns) is not None
+                        else ""
+                    ),
                 }
-                if feed['id'] and feed['imageUrl']:
+                if feed["id"] and feed["imageUrl"]:
                     feeds.append(feed)
 
             # Update app_state instead of global variable
@@ -580,7 +670,9 @@ def detect_vehicles(img_bytes: bytes, feed_id: str = None) -> tuple[bool, bytes,
             return False, img_bytes, {}
 
         # Run YOLO inference with confidence threshold
-        results = app_state.yolo_model(img_array, verbose=False, conf=CONFIDENCE_THRESHOLD)[0]
+        results = app_state.yolo_model(
+            img_array, verbose=False, conf=CONFIDENCE_THRESHOLD
+        )[0]
 
         has_vehicles = False
         valid_boxes = []
@@ -623,27 +715,41 @@ def detect_vehicles(img_bytes: bytes, feed_id: str = None) -> tuple[bool, bytes,
                 valid_boxes.append(box)
 
                 # Track vehicle type
-                vehicle_type_map = {2: 'car', 5: 'bus', 7: 'truck', 3: 'motorcycle', 1: 'bicycle', 0: 'person'}
-                vehicle_types.append(vehicle_type_map.get(class_id, f'class_{class_id}'))
+                vehicle_type_map = {
+                    2: "car",
+                    5: "bus",
+                    7: "truck",
+                    3: "motorcycle",
+                    1: "bicycle",
+                    0: "person",
+                }
+                vehicle_types.append(
+                    vehicle_type_map.get(class_id, f"class_{class_id}")
+                )
                 confidences.append(confidence)
 
             # DEBUG: Log detections
             if total_detections > 0 and feed_id:
                 import random
+
                 if random.random() < 0.01:  # Log 1% of detections to avoid spam
-                    print(f"  [YOLO] {feed_id}: {total_detections} total, {len(valid_boxes)} vehicles, filtered: {filtered_detections}")
+                    print(
+                        f"  [YOLO] {feed_id}: {total_detections} total, {len(valid_boxes)} vehicles, filtered: {filtered_detections}"
+                    )
 
             # Update tracker if enabled
             tracked_vehicles = []
             track_counts = {}
             if has_vehicles and app_state.tracker_manager and feed_id:
-                confirmed_tracks, track_counts = app_state.tracker_manager.update_tracker(feed_id, results)
+                confirmed_tracks, track_counts = (
+                    app_state.tracker_manager.update_tracker(feed_id, results)
+                )
                 tracked_vehicles = [
                     {
                         "track_id": track.track_id,
                         "class": track.class_name,
                         "confidence": round(track.confidence, 2),
-                        "bbox": track.bbox.tolist()
+                        "bbox": track.bbox.tolist(),
                     }
                     for track in confirmed_tracks
                 ]
@@ -652,9 +758,11 @@ def detect_vehicles(img_bytes: bytes, feed_id: str = None) -> tuple[bool, bytes,
             detection_data = {
                 "vehicle_count": len(valid_boxes),
                 "vehicle_types": list(set(vehicle_types)),  # Unique types
-                "confidence_avg": round(sum(confidences) / len(confidences), 2) if confidences else 0,
+                "confidence_avg": (
+                    round(sum(confidences) / len(confidences), 2) if confidences else 0
+                ),
                 "tracked_vehicles": tracked_vehicles,
-                "track_counts": track_counts
+                "track_counts": track_counts,
             }
 
             if has_vehicles:
@@ -672,29 +780,32 @@ def detect_vehicles(img_bytes: bytes, feed_id: str = None) -> tuple[bool, bytes,
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.5,
                             (0, 255, 0),
-                            2
+                            2,
                         )
 
                 # OPTIMIZATION: Use OpenCV for faster encoding
-                _, encoded = cv2.imencode('.jpg', annotated, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                _, encoded = cv2.imencode(
+                    ".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 75]
+                )
                 return True, encoded.tobytes(), detection_data
 
         return False, img_bytes, {}
     except Exception as e:
         print(f"Error in vehicle detection: {e}")
         import traceback
+
         traceback.print_exc()
         return False, img_bytes, {}
 
 
 async def fetch_snapshot(feed: Dict) -> Optional[bytes]:
     """Fetch a single snapshot from a feed"""
-    url = feed['imageUrl']
+    url = feed["imageUrl"]
 
     # Use shared SSL context for proper verification
     async with httpx.AsyncClient(verify=ssl_context, timeout=10.0) as client:
         try:
-            response = await client.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            response = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
             response.raise_for_status()
 
             # Verify it's a valid image
@@ -714,8 +825,8 @@ async def update_feed_cache_worker():
     logger.info("Starting optimized feed cache worker...")
 
     # Get performance settings from config
-    config_batch_size = CONFIG.get('performance', {}).get('batch_size', 240)
-    http_config = CONFIG.get('performance', {}).get('http', {})
+    config_batch_size = CONFIG.get("performance", {}).get("batch_size", 240)
+    http_config = CONFIG.get("performance", {}).get("http", {})
 
     # Get current feeds from app_state
     feeds_data = app_state.feeds_data
@@ -725,17 +836,18 @@ async def update_feed_cache_worker():
 
     # OPTIMIZATION: Connection pool from config
     limits = httpx.Limits(
-        max_keepalive_connections=http_config.get('max_keepalive', 250),
-        max_connections=http_config.get('max_connections', 300),
-        keepalive_expiry=http_config.get('keepalive_expiry', 60)
+        max_keepalive_connections=http_config.get("max_keepalive", 250),
+        max_connections=http_config.get("max_connections", 300),
+        keepalive_expiry=http_config.get("keepalive_expiry", 60),
     )
     timeout = httpx.Timeout(
-        http_config.get('timeout', 5.0),
-        connect=http_config.get('connect_timeout', 2.0)
+        http_config.get("timeout", 5.0), connect=http_config.get("connect_timeout", 2.0)
     )
 
     # Use shared SSL context for proper verification
-    async with httpx.AsyncClient(verify=ssl_context, timeout=timeout, limits=limits) as client:
+    async with httpx.AsyncClient(
+        verify=ssl_context, timeout=timeout, limits=limits
+    ) as client:
         while True:
             # Refresh feeds from app_state each cycle
             feeds_data = app_state.feeds_data
@@ -745,12 +857,16 @@ async def update_feed_cache_worker():
 
             cycle_num = app_state.increment_cycle()
             start_time = time.time()
-            logger.info(f"Starting cycle #{cycle_num}", feeds=len(feeds_data), batch_size=BATCH_SIZE)
+            logger.info(
+                f"Starting cycle #{cycle_num}",
+                feeds=len(feeds_data),
+                batch_size=BATCH_SIZE,
+            )
 
             # Fetch snapshot using shared client with exponential backoff
             async def fetch_with_client(feed):
-                feed_id = feed['id']
-                url = feed['imageUrl']
+                feed_id = feed["id"]
+                url = feed["imageUrl"]
                 current_time = time.time()
 
                 # OPTIMIZATION: Skip feeds in backoff period (using app_state)
@@ -758,7 +874,9 @@ async def update_feed_cache_worker():
                     return feed_id, None, False, "In backoff"
 
                 try:
-                    response = await client.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+                    response = await client.get(
+                        url, headers={"User-Agent": "Mozilla/5.0"}
+                    )
                     response.raise_for_status()
                     img_data = response.content
                     if len(img_data) > 1000:
@@ -774,11 +892,18 @@ async def update_feed_cache_worker():
                     return feed_id, None, False, f"Error: {type(e).__name__}"
 
             # Process feeds in sequential batches
-            batches = [feeds_data[i:i+BATCH_SIZE] for i in range(0, len(feeds_data), BATCH_SIZE)]
+            batches = [
+                feeds_data[i : i + BATCH_SIZE]
+                for i in range(0, len(feeds_data), BATCH_SIZE)
+            ]
 
             all_results = []
             error_counts = {}
-            detection_stats = {"skipped_unchanged": 0, "skipped_selective": 0, "processed": 0}
+            detection_stats = {
+                "skipped_unchanged": 0,
+                "skipped_selective": 0,
+                "processed": 0,
+            }
 
             for batch_num, batch in enumerate(batches, 1):
                 batch_start = time.time()
@@ -795,16 +920,24 @@ async def update_feed_cache_worker():
                         feed_id, img_data, success, error = result
                         if success and img_data:
                             # Use FeedCache's built-in change detection
-                            image_changed = app_state.has_image_changed(feed_id, img_data)
+                            image_changed = app_state.has_image_changed(
+                                feed_id, img_data
+                            )
                             should_detect = True
 
                             if not image_changed:
                                 # Image unchanged, reuse previous detection
                                 has_vehicles = app_state.get_vehicle_detected(feed_id)
-                                annotated_img = app_state.get_cached_image(feed_id) or img_data
+                                annotated_img = (
+                                    app_state.get_cached_image(feed_id) or img_data
+                                )
                                 should_detect = False
                                 detection_stats["skipped_unchanged"] += 1
-                            elif cycle_num > 1 and not app_state.get_vehicle_detected(feed_id) and cycle_num % SELECTIVE_SKIP_INTERVAL != 0:
+                            elif (
+                                cycle_num > 1
+                                and not app_state.get_vehicle_detected(feed_id)
+                                and cycle_num % SELECTIVE_SKIP_INTERVAL != 0
+                            ):
                                 # OPTIMIZATION: Selective detection - only re-check "empty" feeds every 2 cycles
                                 # BUT: Always process on first cycle to establish baseline
                                 has_vehicles = False
@@ -814,32 +947,66 @@ async def update_feed_cache_worker():
 
                             if should_detect:
                                 # OPTIMIZATION: Run YOLO in thread pool to avoid blocking event loop
-                                has_vehicles, annotated_img, detection_data = await loop.run_in_executor(
-                                    app_state.executor, detect_vehicles, img_data, feed_id
+                                has_vehicles, annotated_img, detection_data = (
+                                    await loop.run_in_executor(
+                                        app_state.executor,
+                                        detect_vehicles,
+                                        img_data,
+                                        feed_id,
+                                    )
                                 )
                                 detection_stats["processed"] += 1
 
                                 # Save detection to database if enabled and vehicles detected
-                                if has_vehicles and app_state.db_manager and detection_data:
+                                if (
+                                    has_vehicles
+                                    and app_state.db_manager
+                                    and detection_data
+                                ):
                                     try:
                                         await app_state.db_manager.add_detection(
                                             feed_id=feed_id,
-                                            vehicle_count=detection_data.get("vehicle_count", 0),
-                                            vehicle_types=detection_data.get("vehicle_types", []),
-                                            confidence_avg=detection_data.get("confidence_avg", 0)
+                                            vehicle_count=detection_data.get(
+                                                "vehicle_count", 0
+                                            ),
+                                            vehicle_types=detection_data.get(
+                                                "vehicle_types", []
+                                            ),
+                                            confidence_avg=detection_data.get(
+                                                "confidence_avg", 0
+                                            ),
                                         )
                                     except Exception as e:
-                                        logger.error("Error saving detection to database", feed_id=feed_id, error=str(e))
+                                        logger.error(
+                                            "Error saving detection to database",
+                                            feed_id=feed_id,
+                                            error=str(e),
+                                        )
 
                                 # Send WebSocket update if vehicles detected
-                                if has_vehicles and app_state.ws_manager and detection_data:
+                                if (
+                                    has_vehicles
+                                    and app_state.ws_manager
+                                    and detection_data
+                                ):
                                     try:
-                                        await app_state.ws_manager.send_detection_update(feed_id, detection_data)
+                                        await app_state.ws_manager.send_detection_update(
+                                            feed_id, detection_data
+                                        )
                                     except Exception as e:
-                                        logger.error("Error sending WebSocket update", feed_id=feed_id, error=str(e))
+                                        logger.error(
+                                            "Error sending WebSocket update",
+                                            feed_id=feed_id,
+                                            error=str(e),
+                                        )
 
                             # Store the annotated image (with boxes) in FeedCache
-                            app_state.cache_image(feed_id, annotated_img, is_working=True, has_vehicles=has_vehicles)
+                            app_state.cache_image(
+                                feed_id,
+                                annotated_img,
+                                is_working=True,
+                                has_vehicles=has_vehicles,
+                            )
 
                             # Send streaming updates if enabled and vehicle detected
                             stream_cfg = app_state.stream_config
@@ -849,13 +1016,25 @@ async def update_feed_cache_worker():
                                     try:
                                         if stream_cfg.format == "cot":
                                             cot_msg = generate_cot_message(feed_info)
-                                            send_cot_udp(cot_msg, stream_cfg.ip, stream_cfg.port)
+                                            send_cot_udp(
+                                                cot_msg, stream_cfg.ip, stream_cfg.port
+                                            )
                                         elif stream_cfg.format == "lattice":
-                                            publish_lattice_entity(feed_info, stream_cfg.latticeIntegration, annotated_img)
+                                            publish_lattice_entity(
+                                                feed_info,
+                                                stream_cfg.latticeIntegration,
+                                                annotated_img,
+                                            )
                                         elif stream_cfg.format == "chatsurfer":
-                                            send_chatsurfer_message(feed_info, stream_cfg, annotated_img)
+                                            send_chatsurfer_message(
+                                                feed_info, stream_cfg, annotated_img
+                                            )
                                     except Exception as e:
-                                        logger.error(f"Error streaming {stream_cfg.format}", feed_id=feed_id, error=str(e))
+                                        logger.error(
+                                            f"Error streaming {stream_cfg.format}",
+                                            feed_id=feed_id,
+                                            error=str(e),
+                                        )
                         else:
                             # Feed failed - update status
                             app_state.set_feed_status(feed_id, False)
@@ -864,15 +1043,24 @@ async def update_feed_cache_worker():
                             # OPTIMIZATION: Exponential backoff for failed feeds
                             if error and "In backoff" not in error:
                                 backoff = app_state.get_backoff_interval(feed_id)
-                                app_state.set_feed_backoff(feed_id, time.time(), backoff)
+                                app_state.set_feed_backoff(
+                                    feed_id, time.time(), backoff
+                                )
 
                             if error:
-                                error_type = error.split(':')[0]
-                                error_counts[error_type] = error_counts.get(error_type, 0) + 1
+                                error_type = error.split(":")[0]
+                                error_counts[error_type] = (
+                                    error_counts.get(error_type, 0) + 1
+                                )
 
                 elapsed = time.time() - batch_start
                 success = sum(1 for r in results if isinstance(r, tuple) and r[2])
-                logger.debug(f"Batch {batch_num}/{len(batches)} done", elapsed=f"{elapsed:.2f}s", success=success, total=len(batch))
+                logger.debug(
+                    f"Batch {batch_num}/{len(batches)} done",
+                    elapsed=f"{elapsed:.2f}s",
+                    success=success,
+                    total=len(batch),
+                )
 
             elapsed = time.time() - start_time
             cache_stats = app_state.get_cache_stats()
@@ -885,9 +1073,9 @@ async def update_feed_cache_worker():
                 working=working_count,
                 total=len(feeds_data),
                 vehicles=vehicles_detected,
-                processed=detection_stats['processed'],
-                skipped_unchanged=detection_stats['skipped_unchanged'],
-                skipped_selective=detection_stats['skipped_selective']
+                processed=detection_stats["processed"],
+                skipped_unchanged=detection_stats["skipped_unchanged"],
+                skipped_selective=detection_stats["skipped_selective"],
             )
 
             # Update metrics
@@ -915,10 +1103,14 @@ async def initialize_feeds():
 
     # OPTIMIZATION: Prioritize major highways (國道) for faster initial cache warm-up
     if feeds_data:
-        priority_feeds = [f for f in feeds_data if '國道' in f.get('roadName', '')]
-        other_feeds = [f for f in feeds_data if '國道' not in f.get('roadName', '')]
+        priority_feeds = [f for f in feeds_data if "國道" in f.get("roadName", "")]
+        other_feeds = [f for f in feeds_data if "國道" not in f.get("roadName", "")]
         app_state.feeds_data = priority_feeds + other_feeds
-        logger.info("Feed prioritization complete", priority=len(priority_feeds), other=len(other_feeds))
+        logger.info(
+            "Feed prioritization complete",
+            priority=len(priority_feeds),
+            other=len(other_feeds),
+        )
 
     # Sync feeds to database if enabled
     if app_state.db_manager and feeds_data:
@@ -929,7 +1121,7 @@ async def initialize_feeds():
                 await app_state.db_manager.upsert_feed(feed)
                 synced += 1
             except Exception as e:
-                logger.error("Error syncing feed", feed_id=feed.get('id'), error=str(e))
+                logger.error("Error syncing feed", feed_id=feed.get("id"), error=str(e))
         logger.info("Feed sync complete", synced=synced)
 
     # Start background cache worker
@@ -977,10 +1169,10 @@ async def lifespan(app: FastAPI):
     # Load YOLO model with appropriate device
     logger.info("Loading YOLOv8n model...")
     try:
-        yolo_model = YOLO('yolov8n.pt')  # Nano model for speed
+        yolo_model = YOLO("yolov8n.pt")  # Nano model for speed
 
         # Move model to detected device (GPU if available)
-        if device in ('cuda', 'mps'):
+        if device in ("cuda", "mps"):
             yolo_model.to(device)
             logger.info(f"YOLO model loaded on {device.upper()}")
         else:
@@ -989,12 +1181,14 @@ async def lifespan(app: FastAPI):
         app_state.yolo_model = yolo_model
 
         # Set system info metrics
-        metrics.system_info.info({
-            'version': '1.0.0',
-            'model': 'yolov8n',
-            'device': device,
-            'python_version': str(sys.version_info[:3])
-        })
+        metrics.system_info.info(
+            {
+                "version": "1.0.0",
+                "model": "yolov8n",
+                "device": device,
+                "python_version": str(sys.version_info[:3]),
+            }
+        )
     except Exception as e:
         logger.error("Could not load YOLO model", error=str(e))
         logger.warning("Vehicle detection will be disabled")
@@ -1002,45 +1196,51 @@ async def lifespan(app: FastAPI):
             alert_type="startup_failure",
             severity="critical",
             message="Failed to load YOLO model",
-            metadata={"error": str(e)}
+            metadata={"error": str(e)},
         )
 
     # ==========================================================================
     # Initialize FeedCache (using LRUCache)
     # ==========================================================================
-    cache_config = CONFIG.get('cache', {})
+    cache_config = CONFIG.get("cache", {})
     app_state.initialize_feed_cache(
-        max_feeds=cache_config.get('max_feeds', 5000),
-        max_size_mb=cache_config.get('max_size_mb', 1024)
+        max_feeds=cache_config.get("max_feeds", 5000),
+        max_size_mb=cache_config.get("max_size_mb", 1024),
     )
-    logger.info("FeedCache initialized", max_size_mb=cache_config.get('max_size_mb', 1024))
+    logger.info(
+        "FeedCache initialized", max_size_mb=cache_config.get("max_size_mb", 1024)
+    )
 
     # ==========================================================================
     # Initialize ThreadPoolExecutor
     # ==========================================================================
-    max_workers = CONFIG.get('performance', {}).get('worker_threads', min(os.cpu_count() or 4, 8))
+    max_workers = CONFIG.get("performance", {}).get(
+        "worker_threads", min(os.cpu_count() or 4, 8)
+    )
     app_state.executor = ThreadPoolExecutor(max_workers=max_workers)
     logger.info("ThreadPoolExecutor initialized", max_workers=max_workers)
 
     # ==========================================================================
     # Initialize Database
     # ==========================================================================
-    db_config = CONFIG.get('database', {})
-    if db_config.get('enabled', True):
-        db_type = db_config.get('type', 'sqlite')
-        if db_type == 'sqlite':
-            db_path = db_config.get('path', './data/cctv_data.db')
+    db_config = CONFIG.get("database", {})
+    if db_config.get("enabled", True):
+        db_type = db_config.get("type", "sqlite")
+        if db_type == "sqlite":
+            db_path = db_config.get("path", "./data/cctv_data.db")
             # Ensure data directory exists
             Path(db_path).parent.mkdir(parents=True, exist_ok=True)
             database_url = f"sqlite+aiosqlite:///{db_path}"
         else:
             # PostgreSQL/MySQL configuration
-            host = db_config.get('host', 'localhost')
-            port = db_config.get('port', 5432)
-            username = db_config.get('username', 'user')
-            password = db_config.get('password', 'pass')
-            database = db_config.get('database', 'cctv')
-            database_url = f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{database}"
+            host = db_config.get("host", "localhost")
+            port = db_config.get("port", 5432)
+            username = db_config.get("username", "user")
+            password = db_config.get("password", "pass")
+            database = db_config.get("database", "cctv")
+            database_url = (
+                f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{database}"
+            )
 
         try:
             db_manager = DatabaseManager(database_url)
@@ -1052,20 +1252,25 @@ async def lifespan(app: FastAPI):
             async def cleanup_task():
                 while True:
                     await asyncio.sleep(86400)  # Once per day
-                    retention = db_config.get('retention', {})
+                    retention = db_config.get("retention", {})
                     try:
                         logger.info("Starting scheduled database cleanup...")
                         deleted = await app_state.db_manager.cleanup_old_data(
-                            detection_retention_days=retention.get('detections', 30),
-                            history_retention_days=retention.get('feed_history', 90)
+                            detection_retention_days=retention.get("detections", 30),
+                            history_retention_days=retention.get("feed_history", 90),
                         )
-                        logger.info("Database cleanup completed", records_deleted=deleted)
+                        logger.info(
+                            "Database cleanup completed", records_deleted=deleted
+                        )
 
                         # Log audit entry for cleanup
-                        app_state._log_audit("database_cleanup", {
-                            "retention_days": retention.get('detections', 30),
-                            "records_deleted": deleted
-                        })
+                        app_state._log_audit(
+                            "database_cleanup",
+                            {
+                                "retention_days": retention.get("detections", 30),
+                                "records_deleted": deleted,
+                            },
+                        )
                     except Exception as e:
                         logger.error("Database cleanup failed", error=str(e))
 
@@ -1076,7 +1281,7 @@ async def lifespan(app: FastAPI):
                 alert_type="database_init_failure",
                 severity="error",
                 message="Failed to initialize database",
-                metadata={"error": str(e)}
+                metadata={"error": str(e)},
             )
     else:
         logger.info("Database disabled in config")
@@ -1084,12 +1289,12 @@ async def lifespan(app: FastAPI):
     # ==========================================================================
     # Initialize Tracker
     # ==========================================================================
-    tracking_config = CONFIG.get('detection', {}).get('tracking', {})
-    if tracking_config.get('enabled', True):
+    tracking_config = CONFIG.get("detection", {}).get("tracking", {})
+    if tracking_config.get("enabled", True):
         app_state.tracker_manager = TrackerManager(
-            max_age=tracking_config.get('max_age', 30),
-            min_hits=tracking_config.get('min_hits', 3),
-            iou_threshold=tracking_config.get('iou_threshold', 0.3)
+            max_age=tracking_config.get("max_age", 30),
+            min_hits=tracking_config.get("min_hits", 3),
+            iou_threshold=tracking_config.get("iou_threshold", 0.3),
         )
         logger.info("Vehicle tracking initialized")
     else:
@@ -1105,16 +1310,20 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(initialize_feeds())
 
     # WebSocket heartbeat task
-    websocket_config = CONFIG.get('websocket', {})
-    if websocket_config.get('enabled', True):
+    websocket_config = CONFIG.get("websocket", {})
+    if websocket_config.get("enabled", True):
+
         async def heartbeat_task():
-            interval = websocket_config.get('heartbeat_interval', 30)
+            interval = websocket_config.get("heartbeat_interval", 30)
             while True:
                 await asyncio.sleep(interval)
                 await app_state.ws_manager.send_heartbeat()
 
         asyncio.create_task(heartbeat_task())
-        logger.info("WebSocket heartbeat started", interval=websocket_config.get('heartbeat_interval', 30))
+        logger.info(
+            "WebSocket heartbeat started",
+            interval=websocket_config.get("heartbeat_interval", 30),
+        )
 
     # Metrics update task (using app_state)
     async def metrics_update_task():
@@ -1128,7 +1337,9 @@ async def lifespan(app: FastAPI):
                 metrics.feeds_with_vehicles.set(stats.get("vehiclesDetectedFeeds", 0))
                 metrics.cache_size_bytes.set(stats.get("cacheSize", 0) * 1024 * 1024)
                 if app_state.ws_manager:
-                    metrics.active_websockets.set(len(app_state.ws_manager.active_connections))
+                    metrics.active_websockets.set(
+                        len(app_state.ws_manager.active_connections)
+                    )
             except Exception as e:
                 logger.error("Error updating metrics", error=str(e))
 
@@ -1174,7 +1385,7 @@ app.add_exception_handler(RequestValidationError, custom_validation_exception_ha
 # 1. Error handling (outermost - catches all errors)
 app.add_middleware(
     ErrorHandlerMiddleware,
-    include_traceback=os.environ.get("CCTV_DEBUG", "false").lower() == "true"
+    include_traceback=os.environ.get("CCTV_DEBUG", "false").lower() == "true",
 )
 
 # 2. Request logging
@@ -1185,18 +1396,26 @@ app.add_middleware(
 )
 
 # 3. Rate limiting
-rate_limit_config = CONFIG.get('api', {})
+rate_limit_config = CONFIG.get("api", {})
 app.add_middleware(
     RateLimitMiddleware,
-    requests_per_minute=rate_limit_config.get('rate_limit', 100),
-    burst_size=rate_limit_config.get('burst_size', 20),
-    enabled=rate_limit_config.get('rate_limit_enabled', True),
+    requests_per_minute=rate_limit_config.get("rate_limit", 100),
+    burst_size=rate_limit_config.get("burst_size", 20),
+    enabled=rate_limit_config.get("rate_limit_enabled", True),
 )
 
 # 4. API key authentication
 app.add_middleware(
     APIKeyMiddleware,
-    exclude_paths=["/", "/health", "/health/live", "/health/ready", "/docs", "/redoc", "/openapi.json"],
+    exclude_paths=[
+        "/",
+        "/health",
+        "/health/live",
+        "/health/ready",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+    ],
     exclude_prefixes=["/metrics"],
     enabled=os.environ.get("CCTV_AUTH_ENABLED", "true").lower() == "true",
 )
@@ -1205,7 +1424,7 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # 6. CORS - Configure properly based on environment
-cors_config = CONFIG.get('api', {})
+cors_config = CONFIG.get("api", {})
 allowed_origins = os.environ.get("CCTV_CORS_ORIGINS", "").split(",")
 allowed_origins = [o.strip() for o in allowed_origins if o.strip()]
 
@@ -1222,7 +1441,12 @@ app.add_middleware(
     allow_credentials=True if allowed_origins != ["*"] else False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
+    expose_headers=[
+        "X-Request-ID",
+        "X-RateLimit-Limit",
+        "X-RateLimit-Remaining",
+        "X-RateLimit-Reset",
+    ],
 )
 
 # Mount Prometheus metrics endpoint
@@ -1251,7 +1475,7 @@ async def get_feeds():
         "feeds": app_state.feeds_data,
         "status": app_state.get_all_feed_status(),
         "vehicleDetected": app_state.get_all_vehicle_detected(),
-        "lastUpdate": app_state.last_update
+        "lastUpdate": app_state.last_update,
     }
 
 
@@ -1273,21 +1497,22 @@ async def get_stream(feed_id: str):
     if not feed:
         raise HTTPException(status_code=404, detail="Feed not found")
 
-    url = feed['streamUrl']
+    url = feed["streamUrl"]
 
     async def stream_generator():
         # Use shared SSL context for proper verification
         async with httpx.AsyncClient(verify=ssl_context, timeout=30.0) as client:
             try:
-                async with client.stream('GET', url, headers={'User-Agent': 'Mozilla/5.0'}) as response:
+                async with client.stream(
+                    "GET", url, headers={"User-Agent": "Mozilla/5.0"}
+                ) as response:
                     async for chunk in response.aiter_bytes(chunk_size=4096):
                         yield chunk
             except Exception as e:
                 logger.error("Stream error", feed_id=feed_id, error=str(e))
 
     return StreamingResponse(
-        stream_generator(),
-        media_type="multipart/x-mixed-replace; boundary=--DIGIEVER"
+        stream_generator(), media_type="multipart/x-mixed-replace; boundary=--DIGIEVER"
     )
 
 
@@ -1301,7 +1526,7 @@ async def health_check():
         return {
             "status": "unhealthy",
             "message": "Health checker not initialized",
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     try:
@@ -1312,7 +1537,7 @@ async def health_check():
         return {
             "status": "unhealthy",
             "message": f"Health check error: {str(e)}",
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -1339,7 +1564,7 @@ async def readiness_probe():
             "status": "ready",
             "feeds_loaded": app_state.feeds_count,
             "device": app_state.device,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     else:
         raise HTTPException(
@@ -1348,8 +1573,8 @@ async def readiness_probe():
                 "status": "not_ready",
                 "yolo_loaded": app_state.yolo_model is not None,
                 "feeds_loaded": app_state.feeds_count,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            }
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
         )
 
 
@@ -1370,6 +1595,7 @@ async def get_operational_status():
 
     # Calculate uptime metrics
     import psutil
+
     process = psutil.Process()
     uptime_seconds = time.time() - process.create_time()
 
@@ -1377,54 +1603,57 @@ async def get_operational_status():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "uptime_seconds": int(uptime_seconds),
         "uptime_human": f"{int(uptime_seconds // 3600)}h {int((uptime_seconds % 3600) // 60)}m",
-
         "feeds": {
             "total": stats.get("totalFeeds", 0),
             "online": stats.get("workingFeeds", 0),
             "offline": stats.get("offlineFeeds", 0),
-            "online_percentage": round((stats.get("workingFeeds", 0) / stats.get("totalFeeds", 1) * 100), 2),
+            "online_percentage": round(
+                (stats.get("workingFeeds", 0) / stats.get("totalFeeds", 1) * 100), 2
+            ),
             "with_vehicles": stats.get("vehiclesDetectedFeeds", 0),
-            "last_update": stats.get("lastUpdate", 0)
+            "last_update": stats.get("lastUpdate", 0),
         },
-
         "cache": {
             "size_mb": cache_stats.get("size_mb", 0),
             "items": cache_stats.get("items", 0),
             "hit_rate": cache_stats.get("hit_rate", 0),
-            "evictions": cache_stats.get("evictions", 0)
+            "evictions": cache_stats.get("evictions", 0),
         },
-
         "components": {
             "yolo_model": "loaded" if app_state.yolo_model else "not_loaded",
             "device": app_state.device,
             "database": "enabled" if app_state.db_manager else "disabled",
             "tracker": "enabled" if app_state.tracker_manager else "disabled",
-            "websocket": "enabled" if app_state.ws_manager else "disabled"
+            "websocket": "enabled" if app_state.ws_manager else "disabled",
         },
-
         "websocket": {
-            "active_connections": len(app_state.ws_manager.active_connections) if app_state.ws_manager else 0,
-            "stats": app_state.ws_manager.get_stats() if app_state.ws_manager else {}
+            "active_connections": (
+                len(app_state.ws_manager.active_connections)
+                if app_state.ws_manager
+                else 0
+            ),
+            "stats": app_state.ws_manager.get_stats() if app_state.ws_manager else {},
         },
-
         "circuit_breakers": {
-            "feed_fetcher": app_state.feed_circuit_breaker.get_state() if app_state.feed_circuit_breaker else {}
+            "feed_fetcher": (
+                app_state.feed_circuit_breaker.get_state()
+                if app_state.feed_circuit_breaker
+                else {}
+            )
         },
-
-        "alerts": {
-            "recent": alert_manager.get_recent_alerts(limit=10)
-        },
-
-        "audit_log": {
-            "recent": app_state.get_audit_log(limit=5)
-        }
+        "alerts": {"recent": alert_manager.get_recent_alerts(limit=10)},
+        "audit_log": {"recent": app_state.get_audit_log(limit=5)},
     }
 
     # Add database stats if available
     if app_state.db_manager:
         try:
-            from database import Detection as DetectionModel, VehicleTrack as VehicleTrackModel
+            from database import (
+                Detection as DetectionModel,
+                VehicleTrack as VehicleTrackModel,
+            )
             from sqlalchemy import func, select
+
             async with app_state.db_manager.session() as session:
                 detection_count = await session.execute(
                     select(func.count()).select_from(DetectionModel)
@@ -1435,7 +1664,7 @@ async def get_operational_status():
 
                 operational_status["database"] = {
                     "detections_count": detection_count.scalar(),
-                    "tracks_count": track_count.scalar()
+                    "tracks_count": track_count.scalar(),
                 }
         except Exception as e:
             logger.error("Failed to get database stats", error=str(e))
@@ -1461,10 +1690,10 @@ async def get_feed_history(feed_id: str, hours: int = 24):
                     "timestamp": d.timestamp.isoformat(),
                     "vehicle_count": d.vehicle_count,
                     "vehicle_types": d.vehicle_types,
-                    "confidence_avg": d.confidence_avg
+                    "confidence_avg": d.confidence_avg,
                 }
                 for d in detections
-            ]
+            ],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching history: {str(e)}")
@@ -1478,10 +1707,7 @@ async def get_feed_stats(feed_id: str, days: int = 7):
 
     try:
         stats = await app_state.db_manager.get_feed_stats(feed_id, days)
-        return {
-            "feed_id": feed_id,
-            **stats
-        }
+        return {"feed_id": feed_id, **stats}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
 
@@ -1493,7 +1719,7 @@ async def search_feeds(
     lat_min: Optional[float] = None,
     lat_max: Optional[float] = None,
     lon_min: Optional[float] = None,
-    lon_max: Optional[float] = None
+    lon_max: Optional[float] = None,
 ):
     """Search feeds with filters"""
     results = app_state.feeds_data.copy()
@@ -1502,39 +1728,50 @@ async def search_feeds(
 
     # Filter by road name
     if road:
-        results = [f for f in results if road.lower() in f.get('roadName', '').lower()]
+        results = [f for f in results if road.lower() in f.get("roadName", "").lower()]
 
     # Filter by vehicle detection
     if has_vehicles is not None:
         results = [
-            f for f in results
-            if vehicle_detected.get(f['id'], False) == has_vehicles
+            f for f in results if vehicle_detected.get(f["id"], False) == has_vehicles
         ]
 
     # Filter by bounding box
-    if lat_min is not None and lat_max is not None and lon_min is not None and lon_max is not None:
+    if (
+        lat_min is not None
+        and lat_max is not None
+        and lon_min is not None
+        and lon_max is not None
+    ):
         results = [
-            f for f in results
-            if (lat_min <= float(f.get('lat', 0) or 0) <= lat_max and
-                lon_min <= float(f.get('lon', 0) or 0) <= lon_max)
+            f
+            for f in results
+            if (
+                lat_min <= float(f.get("lat", 0) or 0) <= lat_max
+                and lon_min <= float(f.get("lon", 0) or 0) <= lon_max
+            )
         ]
 
     # Add status and vehicle detection to results
     enriched_results = []
     for feed in results:
         feed_copy = feed.copy()
-        feed_copy['status'] = feed_status.get(feed['id'], False)
-        feed_copy['vehicleDetected'] = vehicle_detected.get(feed['id'], False)
+        feed_copy["status"] = feed_status.get(feed["id"], False)
+        feed_copy["vehicleDetected"] = vehicle_detected.get(feed["id"], False)
         enriched_results.append(feed_copy)
 
     return {
         "query": {
             "road": road,
             "has_vehicles": has_vehicles,
-            "bbox": [lat_min, lon_min, lat_max, lon_max] if all([lat_min, lat_max, lon_min, lon_max]) else None
+            "bbox": (
+                [lat_min, lon_min, lat_max, lon_max]
+                if all([lat_min, lat_max, lon_min, lon_max])
+                else None
+            ),
         },
         "count": len(enriched_results),
-        "feeds": enriched_results
+        "feeds": enriched_results,
     }
 
 
@@ -1546,34 +1783,28 @@ async def get_map_data():
     vehicle_detected = app_state.get_all_vehicle_detected()
 
     for feed in app_state.feeds_data:
-        lat = float(feed.get('lat', 0) or 0)
-        lon = float(feed.get('lon', 0) or 0)
+        lat = float(feed.get("lat", 0) or 0)
+        lon = float(feed.get("lon", 0) or 0)
 
         if lat == 0 or lon == 0:
             continue
 
         feature = {
             "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [lon, lat]
-            },
+            "geometry": {"type": "Point", "coordinates": [lon, lat]},
             "properties": {
-                "id": feed['id'],
-                "roadName": feed.get('roadName', ''),
-                "locationMile": feed.get('locationMile', ''),
-                "description": feed.get('description', ''),
-                "direction": feed.get('direction', ''),
-                "isWorking": feed_status.get(feed['id'], False),
-                "hasVehicles": vehicle_detected.get(feed['id'], False)
-            }
+                "id": feed["id"],
+                "roadName": feed.get("roadName", ""),
+                "locationMile": feed.get("locationMile", ""),
+                "description": feed.get("description", ""),
+                "direction": feed.get("direction", ""),
+                "isWorking": feed_status.get(feed["id"], False),
+                "hasVehicles": vehicle_detected.get(feed["id"], False),
+            },
         }
         map_features.append(feature)
 
-    return {
-        "type": "FeatureCollection",
-        "features": map_features
-    }
+    return {"type": "FeatureCollection", "features": map_features}
 
 
 @app.get("/api/stream/config")
@@ -1595,10 +1826,9 @@ async def set_stream_config(config: StreamConfigRequest):
         latticeSandboxToken=config.latticeSandboxToken or "",
         latticeIntegration=config.latticeIntegration or "taiwan-cctv",
         latticeUrl=config.latticeUrl or "",
-        chatsurferSession=config.chatsurferSession or "",
         chatsurferRoom=config.chatsurferRoom or "",
         chatsurferNickname=config.chatsurferNickname or "CCTV_Bot",
-        chatsurferDomain=config.chatsurferDomain or "chatsurferxmppunclass"
+        chatsurferDomain=config.chatsurferDomain or "chatsurferxmppunclass",
     )
 
     # Initialize Lattice client if token provided and format is lattice
@@ -1606,16 +1836,24 @@ async def set_stream_config(config: StreamConfigRequest):
         initialize_lattice_client(
             env_token=config.latticeToken,
             sandbox_token=config.latticeSandboxToken or None,
-            base_url=config.latticeUrl or None
+            base_url=config.latticeUrl or None,
         )
 
     status = "enabled" if config.enabled else "disabled"
     if config.format == "cot":
         logger.info(f"Stream Out {status}: CoT", ip=config.ip, port=config.port)
     elif config.format == "lattice":
-        logger.info(f"Stream Out {status}: Lattice", integration=config.latticeIntegration, url=config.latticeUrl or 'default')
+        logger.info(
+            f"Stream Out {status}: Lattice",
+            integration=config.latticeIntegration,
+            url=config.latticeUrl or "default",
+        )
     elif config.format == "chatsurfer":
-        logger.info(f"Stream Out {status}: ChatSurfer", room=config.chatsurferRoom, nickname=config.chatsurferNickname)
+        logger.info(
+            f"Stream Out {status}: ChatSurfer",
+            room=config.chatsurferRoom,
+            nickname=config.chatsurferNickname,
+        )
 
     return {"status": "success", "config": updated_config.to_dict()}
 
@@ -1627,7 +1865,10 @@ async def reset_database():
         raise HTTPException(status_code=503, detail="Database not enabled")
 
     try:
-        from database import Detection as DetectionModel, VehicleTrack as VehicleTrackModel
+        from database import (
+            Detection as DetectionModel,
+            VehicleTrack as VehicleTrackModel,
+        )
         from sqlalchemy import delete
 
         async with app_state.db_manager.session() as session:
@@ -1640,22 +1881,25 @@ async def reset_database():
         logger.info("Database reset completed - all detections and tracks cleared")
 
         # Audit log the reset
-        app_state._log_audit("database_reset", {
-            "action": "manual_reset",
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        app_state._log_audit(
+            "database_reset",
+            {
+                "action": "manual_reset",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
         await alert_manager.send_alert(
             alert_type="database_reset",
             severity="warning",
             message="Database has been manually reset",
-            metadata={"timestamp": datetime.now(timezone.utc).isoformat()}
+            metadata={"timestamp": datetime.now(timezone.utc).isoformat()},
         )
 
         return {
             "status": "success",
             "message": "Database reset completed",
-            "cleared": ["detections", "vehicle_tracks"]
+            "cleared": ["detections", "vehicle_tracks"],
         }
 
     except Exception as e:
@@ -1706,4 +1950,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")
