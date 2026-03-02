@@ -1,0 +1,162 @@
+replicaCount: 1
+
+image:
+  repository: cctv-viewer
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+env:
+  CCTV_AUTH_ENABLED: "false"
+  CCTV_SSL_VERIFY: "true"
+  CCTV_ENV: "production"
+
+service:
+  type: ClusterIP
+  portApi: 8000
+  portWeb: 8001
+  
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+          backendPort: 8001
+  tls: []
+
+resources:
+  requests:
+    cpu: "2"
+    memory: "4Gi"
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+persistence:
+  data:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  logs:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 5Gi
+
+config:
+  detection:
+    confidence_threshold: 0.6
+    min_box_size: 20
+    vehicle_classes:
+      - 2
+      - 5
+      - 7
+    detect_pedestrians: false
+    detect_motorcycles: false
+    detect_bicycles: false
+    tracking:
+      enabled: true
+      max_age: 30
+      min_hits: 3
+      iou_threshold: 0.3
+  performance:
+    batch_size: 50
+    worker_threads: 8
+    selective_skip_interval: 2
+    http:
+      max_connections: 300
+      max_keepalive: 250
+      keepalive_expiry: 60
+      timeout: 15.0
+      connect_timeout: 5.0
+  recording:
+    enabled: false
+    on_vehicle_detection: true
+    duration: 30
+    format: "mp4"
+    codec: "h264"
+    output_dir: "/app/data/recordings"
+    retention_days: 7
+  database:
+    enabled: true
+    type: "sqlite"
+    path: "/app/data/cctv_data.db"
+    retention:
+      detections: 30
+      feed_history: 90
+  websocket:
+    enabled: true
+    heartbeat_interval: 30
+    max_connections: 100
+  api:
+    enable_cors: true
+    enable_gzip: true
+    rate_limit: 1000
+  alerts:
+    enabled: false
+    email:
+      enabled: false
+      smtp_host: "smtp.gmail.com"
+      smtp_port: 587
+      from_address: "alerts@example.com"
+      to_addresses:
+        - "admin@example.com"
+    webhook:
+      enabled: false
+      url: ""
+  logging:
+    level: "INFO"
+    format: "json"
+    file: "/app/logs/cctv.log"
+    max_size_mb: 100
+    backup_count: 5
+  stream_out:
+    enabled: false
+    format: "cot"
+    cot:
+      ip: "127.0.0.1"
+      port: 8087
+    lattice:
+      url: ""
+      token: ""
+      sandbox_token: ""
+      integration_name: "taiwan-cctv"
