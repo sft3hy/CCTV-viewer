@@ -33,6 +33,11 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.existingSecret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.existingSecret }}
+          {{- end }}
           env:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
@@ -68,6 +73,9 @@ spec:
               mountPath: /app/data
             - name: logs-volume
               mountPath: /app/logs
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: config-volume
           configMap:
@@ -86,6 +94,9 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
